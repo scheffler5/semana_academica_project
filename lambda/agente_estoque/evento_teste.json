@@ -1,0 +1,9 @@
+{
+  "messageVersion": "1.0",
+  "agent": { "name": "agente-estoque", "id": "TESTE", "alias": "TSTALIASID", "version": "DRAFT" },
+  "sessionId": "teste-console",
+  "inputText": "Quais itens estão com estoque baixo?",
+  "actionGroup": "ferramentas-estoque",
+  "function": "itens_estoque_baixo",
+  "parameters": []
+}

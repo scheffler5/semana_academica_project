@@ -1,0 +1,121 @@
+{
+  "_comentario": "Fonte única das ferramentas do agente (formato functionSchema do Bedrock Agents). Usada pelo agente simulado local e pelos testes; no console do Bedrock cadastre exatamente estas funções.",
+  "actionGroupName": "ferramentas-estoque",
+  "functions": [
+    {
+      "name": "consultar_estoque",
+      "description": "Busca itens do estoque por nome, SKU ou categoria e retorna SKU, nome, quantidade, estoque mínimo e preço. Sem termo, lista todos os itens.",
+      "parameters": {
+        "termo": {
+          "type": "string",
+          "description": "Texto a buscar (nome, SKU ou categoria). Opcional.",
+          "required": false
+        }
+      }
+    },
+    {
+      "name": "itens_estoque_baixo",
+      "description": "Lista os itens que estão no estoque mínimo ou abaixo e precisam de reposição.",
+      "parameters": {}
+    },
+    {
+      "name": "resumo_estoque",
+      "description": "Retorna totais do estoque: quantidade de itens cadastrados, total de unidades e valor total em reais.",
+      "parameters": {}
+    },
+    {
+      "name": "cadastrar_item",
+      "description": "Cadastra um novo produto no estoque. O código (SKU) é gerado automaticamente pelo sistema e devolvido na resposta.",
+      "parameters": {
+        "nome": {
+          "type": "string",
+          "description": "Nome do produto",
+          "required": true
+        },
+        "preco": {
+          "type": "number",
+          "description": "Preço unitário em reais, ex.: 199.90",
+          "required": true
+        },
+        "quantidade": {
+          "type": "integer",
+          "description": "Quantidade inicial em estoque. Padrão 0.",
+          "required": false
+        },
+        "categoria": {
+          "type": "string",
+          "description": "Categoria do produto (define o prefixo do código). Padrão: Geral.",
+          "required": false
+        },
+        "estoque_minimo": {
+          "type": "integer",
+          "description": "Estoque mínimo antes de alertar reposição. Padrão 5.",
+          "required": false
+        }
+      }
+    },
+    {
+      "name": "atualizar_item",
+      "description": "Altera o preço, o estoque mínimo ou o nome de um item existente. Informe apenas o que vai mudar. Não altera quantidade (use registrar_movimentacao).",
+      "parameters": {
+        "sku": {
+          "type": "string",
+          "description": "SKU do item",
+          "required": true
+        },
+        "preco": {
+          "type": "number",
+          "description": "Novo preço unitário em reais",
+          "required": false
+        },
+        "estoque_minimo": {
+          "type": "integer",
+          "description": "Novo estoque mínimo",
+          "required": false
+        },
+        "nome": {
+          "type": "string",
+          "description": "Novo nome",
+          "required": false
+        }
+      }
+    },
+    {
+      "name": "registrar_movimentacao",
+      "description": "Registra uma entrada (compra/reposição) ou saída (venda/retirada) de um item e atualiza a quantidade em estoque.",
+      "parameters": {
+        "sku": {
+          "type": "string",
+          "description": "SKU do item, ex.: MS-002",
+          "required": true
+        },
+        "tipo": {
+          "type": "string",
+          "description": "\"entrada\" ou \"saida\"",
+          "required": true
+        },
+        "quantidade": {
+          "type": "integer",
+          "description": "Número de unidades",
+          "required": true
+        },
+        "observacao": {
+          "type": "string",
+          "description": "Motivo da movimentação. Opcional.",
+          "required": false
+        }
+      }
+    },
+    {
+      "name": "prever_demanda",
+      "description": "Prevê, pela média móvel das saídas recentes, quanto do item deve sair nos próximos 7 dias e em quantos dias o estoque acaba.",
+      "parameters": {
+        "sku": {
+          "type": "string",
+          "description": "SKU do item",
+          "required": true
+        }
+      }
+    }
+  ]
+}

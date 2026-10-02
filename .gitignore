@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+backend/.env
+backend/estoque.db
+
+# Node
+node_modules/
+frontend/dist/
+
+.DS_Store
+
+# Desenvolvimento local
+.pgdata/
+backend/uploads/
+.pytest_cache/
+.local/
+
+# Somente código no repositório: nada de imagens nem bancos de dados
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.ico
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+!deploy/schema.sql
+*.dump
+*.bak
