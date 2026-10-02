@@ -38,8 +38,8 @@ cd "$APP_DIR/backend"
 ./venv/bin/pip install -q -r requirements.txt
 if [ ! -f .env ]; then
   cp .env.example .env
-  chmod 600 .env   # guarda a senha do banco: só o ec2-user lê
-  echo "    !! Criei backend/.env a partir do exemplo. Preencha DB_HOST, DB_PASSWORD, S3_BUCKET..."
+  chmod 600 .env
+  echo "    !! Criei backend/.env a partir do exemplo. Preencha S3_BUCKET (obrigatório)."
 fi
 
 echo "==> 4/6 Frontend: build do React"

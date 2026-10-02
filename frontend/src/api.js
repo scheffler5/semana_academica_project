@@ -3,8 +3,7 @@
 
 export const SERVICE_NAMES = {
   api: "Servidor da aplicação (EC2)",
-  database: "Banco de dados (Aurora)",
-  s3: "Fotos (Amazon S3)",
+  s3: "Armazenamento (Amazon S3)",
   agent: "Assistente de IA (Bedrock + Lambda)",
 };
 

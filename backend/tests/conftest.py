@@ -1,15 +1,12 @@
-"""Sobe a API de verdade (uvicorn) numa porta livre, com um banco de TESTE separado.
+"""Sobe a API de verdade (uvicorn) numa porta livre, com um bucket S3 de TESTE (emulador Moto).
 
-- Com `pgserver` instalado: PostgreSQL local, banco "estoque_teste" recriado a cada execução.
-- Sem ele: SQLite temporário.
-
-A Lambda do agente chama essa API por HTTP, exatamente como faz na AWS.
+O S3 é o único armazenamento do sistema (fotos E dados). A Lambda do agente chama essa API
+por HTTP, exatamente como faz na AWS.
 """
 import os
 import secrets
 import socket
 import sys
-import tempfile
 import threading
 import time
 from pathlib import Path
@@ -27,17 +24,6 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
-def _test_database_url() -> str:
-    try:
-        import pgserver
-    except ImportError:
-        return f"sqlite:///{tempfile.mkdtemp()}/teste.db"
-    srv = pgserver.get_server(ROOT / ".pgdata", cleanup_mode=None)
-    srv.psql("DROP DATABASE IF EXISTS estoque_teste WITH (FORCE);")
-    srv.psql("CREATE DATABASE estoque_teste;")
-    return srv.get_uri().replace("/postgres?", "/estoque_teste?", 1)
-
-
 PORT = _free_port()
 BASE_URL = f"http://127.0.0.1:{PORT}"
 S3_PORT = _free_port()
@@ -51,7 +37,6 @@ _moto.start()
 
 # Precisa ser definido ANTES de importar o app (config lê o ambiente na importação)
 os.environ.update({
-    "DATABASE_URL": _test_database_url(),
     "AGENT_MODE": "simulado",
     "LOCAL_API_URL": BASE_URL,
     "API_BASE_URL": BASE_URL,   # variável que a Lambda lê
@@ -67,10 +52,10 @@ os.environ.update({
 @pytest.fixture(scope="session")
 def server():
     import uvicorn
-    from app import storage
+    from app import s3client
     from app.main import app
 
-    storage._s3.create_bucket(Bucket=BUCKET)
+    s3client._s3.create_bucket(Bucket=BUCKET)
     srv = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=PORT, log_level="warning"))
     thread = threading.Thread(target=srv.run, daemon=True)
     thread.start()

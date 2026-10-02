@@ -1,14 +1,15 @@
 """O que acontece quando cada serviço cai: a API responde 503 dizendo QUAL serviço falhou,
-o resto do sistema continua funcionando, e nada de detalhe interno vaza para o usuário."""
+o resto do sistema continua funcionando, e nada de detalhe interno vaza para o usuário.
+
+O S3 é o único armazenamento (fotos E dados): quando ele cai, tudo que depende de dados cai
+junto — não existe mais um "banco" separado para continuar funcionando sozinho."""
 import boto3
 import pytest
 from botocore.config import Config
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from conftest import PNG_MIN, functions
 
-LEAKS = ["Traceback", "Errno", "psycopg2", "botocore", "127.0.0.1", "localhost", "Exception", "socket"]
+LEAKS = ["Traceback", "Errno", "botocore", "127.0.0.1", "localhost", "Exception", "socket"]
 
 
 def assert_safe(body: dict):
@@ -19,30 +20,18 @@ def assert_safe(body: dict):
 
 
 @pytest.fixture
-def s3_down(monkeypatch):
-    from app import storage
-    dead = boto3.client("s3", endpoint_url="http://127.0.0.1:9", region_name="us-east-1",
-                        config=Config(connect_timeout=0.5, read_timeout=0.5, retries={"max_attempts": 1}))
-    monkeypatch.setattr(storage, "_s3", dead)
-    monkeypatch.setattr(storage, "_probe_s3", dead)
-    monkeypatch.setattr(storage, "_circuit_open_until", 0.0)  # restaurado ao fim do teste
+def break_s3(monkeypatch):
+    """Devolve uma função: chame-a quando quiser simular o S3 fora do ar a partir daquele
+    ponto do teste (assim dá para buscar dados ANTES de derrubar o serviço)."""
+    from app import s3client
 
-
-@pytest.fixture
-def db_down(monkeypatch):
-    from app import main
-    dead = create_engine("postgresql+psycopg2://x:y@127.0.0.1:9/nada", connect_args={"connect_timeout": 1})
-    monkeypatch.setattr(main, "probe_engine", dead)
-
-    def broken_db():
-        db = sessionmaker(bind=dead)()
-        try:
-            yield db
-        finally:
-            db.close()
-    main.app.dependency_overrides[main.get_db] = broken_db
-    yield
-    main.app.dependency_overrides.clear()
+    def _break():
+        dead = boto3.client("s3", endpoint_url="http://127.0.0.1:9", region_name="us-east-1",
+                            config=Config(connect_timeout=0.5, read_timeout=0.5, retries={"max_attempts": 1}))
+        monkeypatch.setattr(s3client, "_s3", dead)
+        monkeypatch.setattr(s3client, "_probe_s3", dead)
+        monkeypatch.setattr(s3client, "_circuit_open_until", 0.0)
+    return _break
 
 
 @pytest.fixture
@@ -53,28 +42,35 @@ def agent_down(monkeypatch, tmp_path):
     monkeypatch.setattr(agent_local, "FAILURE_FLAG", flag)
 
 
-# ------------------------------------------------------------- S3
+# ------------------------------------------------------------- S3 (fotos + dados)
 
-def test_s3_fora_do_ar(api, item, s3_down):
+def test_s3_fora_do_ar(api, item, break_s3):
+    item_id = item("TC-003")["id"]  # busca ANTES de derrubar o S3
+    break_s3()
+
     health = api.get("/api/health").json()
-    assert health["status"] == "degraded" and health["services"]["s3"]["status"] == "down"
+    assert health["status"] == "down" and health["services"]["s3"]["status"] == "down"
 
-    res = api.post(f"/api/items/{item('TC-003')['id']}/image", files={"file": ("f.png", PNG_MIN, "image/png")})
+    # fotos
+    res = api.post(f"/api/items/{item_id}/image", files={"file": ("f.png", PNG_MIN, "image/png")})
     assert res.status_code == 503
     body = res.json()
     assert body["service"] == "s3" and "S3" in body["message"]
     assert_safe(body)
 
-    # o resto do sistema continua: listar e cadastrar itens funciona sem S3
-    assert api.get("/api/items").status_code == 200
-    assert api.post("/api/items", json={"sku": "SEM-S3", "name": "Sem foto", "unit_price": 1}).status_code == 201
+    # dados: também vivem no S3, então caem junto (não há mais um "banco" à parte)
+    res = api.get("/api/items")
+    assert res.status_code == 503 and res.json()["service"] == "s3"
+    assert_safe(res.json())
+
+    res = api.post("/api/items", json={"name": "Sem S3", "unit_price": 1})
+    assert res.status_code == 503 and res.json()["service"] == "s3"
 
 
-def test_circuit_breaker_responde_rapido_depois_da_primeira_falha(api, item, s3_down):
+def test_circuit_breaker_responde_rapido_depois_da_primeira_falha(api, item, break_s3):
     import time
-    from app import storage
-    storage._circuit_open_until = 0.0
     item_id = item("NB-001")["id"]
+    break_s3()
     assert api.get(f"/api/items/{item_id}/image").status_code == 503   # tenta o S3 e falha
     start = time.perf_counter()
     res = api.get(f"/api/items/{item_id}/image")                         # circuito aberto
@@ -82,19 +78,9 @@ def test_circuit_breaker_responde_rapido_depois_da_primeira_falha(api, item, s3_
     assert time.perf_counter() - start < 0.3
 
 
-# ------------------------------------------------------------- banco
-
-def test_banco_fora_do_ar(api, db_down):
-    health = api.get("/api/health").json()
-    assert health["status"] == "down" and health["services"]["database"]["status"] == "down"
-
-    res = api.get("/api/items")
-    assert res.status_code == 503
-    assert res.json()["service"] == "database"
-    assert_safe(res.json())
-
-
-def test_agente_avisa_quando_o_banco_cai(chat, db_down):
+def test_agente_avisa_quando_o_s3_cai(api, chat, break_s3):
+    break_s3()
+    api.get("/api/items")  # primeira falha abre o circuito (mensagem fica estável a partir daqui)
     r = chat("Quais itens estão com estoque baixo?")
     assert functions(r) == ["itens_estoque_baixo"]
     assert "indisponível" in r["answer"]

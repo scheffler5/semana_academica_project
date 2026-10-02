@@ -1,19 +1,21 @@
 # 📦 Estoque Inteligente: laboratório AWS (Cloud Practitioner)
 
 Sistema simples de controle de estoque com **assistente de IA**, feito para demonstrar
-em aula um deploy real na AWS usando 7 serviços:
+em aula um deploy real na AWS usando 6 serviços:
 
 | Serviço | Papel no projeto |
 |---|---|
-| **Amazon VPC + Internet Gateway** | Rede isolada. Sub-rede pública (EC2) com saída para a internet; sub-redes privadas (Aurora e Lambda) sem acesso direto. |
+| **Amazon VPC + Internet Gateway** | Rede isolada. Sub-rede pública (EC2) com saída para a internet; sub-rede privada (Lambda) sem acesso direto. |
 | **Amazon EC2** | Servidor que hospeda o site (React + nginx) e a API (Python/FastAPI). |
-| **Amazon Aurora (PostgreSQL Serverless v2)** | Banco de dados dos itens e movimentações. |
-| **Amazon S3** | Fotos dos itens em bucket privado (servidas pela API, sem expor credenciais). |
+| **Amazon S3** | **Único armazenamento do sistema:** fotos dos itens E os dados (produtos e movimentações, em dois arquivos JSON), servidos pela API, sem expor credenciais. |
 | **Amazon Bedrock (Agents)** | Agente de IA generativa: entende português e decide quais ações executar. |
 | **AWS Lambda** | As "ferramentas" do agente: consultam/alteram o estoque chamando a API pela rede privada. |
 | **Amazon CloudWatch / IAM** | Logs da API e da Lambda; roles com privilégio mínimo (nenhuma chave de acesso no código). |
 
-A previsão de demanda (em quantos dias um item acaba) é calculada no próprio backend por média móvel.
+Não há banco de dados gerenciado (Aurora/RDS) neste laboratório — de propósito, para manter o
+deploy simples no tempo de um minicurso. Os produtos e movimentações vivem em dois documentos
+JSON (`data/items.json`, `data/movements.json`) dentro do mesmo bucket S3 das fotos. A previsão
+de demanda (em quantos dias um item acaba) é calculada no próprio backend por média móvel.
 
 ## Arquitetura
 
@@ -21,26 +23,26 @@ O diagrama da arquitetura é desenhado pelo próprio sistema (código em
 `frontend/src/components/ArchitectureDiagram.jsx`): abra a tela **Arquitetura AWS** para ver o status
 de cada serviço ao vivo e use **Baixar PNG** para levar a imagem para os slides.
 
-> O repositório guarda **só código**: nenhuma imagem nem banco de dados é versionado. As tabelas são
-> criadas pela API ao iniciar (ou por [`deploy/schema.sql`](deploy/schema.sql), gerado dos modelos), os produtos de
-> exemplo por `backend/app/seed.py` na primeira execução, e as fotos de exemplo podem ser
-> geradas com `local/fotos_exemplo/gerar_fotos.py`.
+> O repositório guarda **só código**: nenhuma imagem nem dado é versionado. Os produtos de
+> exemplo são criados por `backend/app/seed.py` na primeira execução (direto no S3), e as fotos
+> de exemplo podem ser geradas com `local/fotos_exemplo/gerar_fotos.py`.
 
 Fluxo de uma pergunta ao assistente ("Quais itens preciso repor?"):
 
 1. O navegador envia a pergunta para `POST /api/chat` na EC2.
 2. A API chama o **Bedrock Agent** (`InvokeAgent`).
 3. O modelo de linguagem decide usar a ferramenta `itens_estoque_baixo` e o Bedrock invoca a **Lambda**.
-4. A Lambda (dentro da VPC) chama `GET /api/items?low_stock=true` no **IP privado** da EC2.
-5. A API consulta o **Aurora** e devolve os itens; o agente monta a resposta em português.
+4. A Lambda (dentro da VPC, sub-rede privada) chama `GET /api/items?low_stock=true` no **IP privado** da EC2.
+5. A API lê o JSON do **S3** e devolve os itens; o agente monta a resposta em português.
 
 ## Estrutura
 
 ```
 backend/            API FastAPI (um arquivo por serviço AWS)
   app/main.py         rotas da API
-  app/db.py           conexão com Aurora (ou SQLite local)
-  app/storage.py      Amazon S3
+  app/store.py        "banco de dados": items.json/movements.json dentro do S3
+  app/s3client.py      cliente S3 compartilhado (fotos + dados) com circuit breaker
+  app/storage.py      Amazon S3 — só as fotos
   app/agent.py        Amazon Bedrock Agents (ou modo simulado)
   app/agent_local.py  agente simulado: "LLM" de regras + ciclo de ferramentas do Bedrock
   app/forecast.py     previsão de demanda (média móvel)
@@ -49,11 +51,11 @@ backend/            API FastAPI (um arquivo por serviço AWS)
   app/instance.py     metadados da EC2
   app/seed.py         dados de exemplo (10 itens, 30 dias de histórico)
   tests/              testes de API, Lambda, contrato das ferramentas e conversas do agente
-frontend/           React + Vite (Painel, Itens, Assistente IA, Arquitetura AWS)
+frontend/           React + Vite (Dashboard, Produtos, Cadastro, Movimentações, Arquitetura AWS)
 lambda/             ferramentas do agente (só biblioteca padrão: dá para colar no console)
 bedrock/            instruções do agente e action_group.json (fonte única das ferramentas)
-local/              PostgreSQL local, subir a API e chat de terminal
-deploy/             script de instalação da EC2, nginx, systemd, política IAM e schema.sql (tabelas)
+local/              subir o S3 local, rodar a API, chat de terminal
+deploy/             script de instalação da EC2, nginx, systemd e política IAM
 docs/               roteiros da aula, falhas e segurança
 ```
 
@@ -66,12 +68,11 @@ docs/               roteiros da aula, falhas e segurança
 
 ## Fase 1: rodar e testar tudo localmente
 
-Localmente o sistema roda **montado como em produção**, trocando só os serviços gerenciados:
+Localmente o sistema roda **montado como em produção**, trocando só o serviço gerenciado:
 
 | Na AWS | Localmente |
 |---|---|
-| Aurora PostgreSQL | PostgreSQL 16 local (`pgserver`, sem Docker) |
-| S3 | **emulador de S3 (Moto)**: o backend usa o mesmo boto3, só muda o endpoint |
+| S3 (fotos + dados) | **emulador de S3 (Moto)**: o backend usa o mesmo boto3, só muda o endpoint |
 | Bedrock Agent (LLM) | agente simulado (`backend/app/agent_local.py`), "LLM" de regras |
 | Lambda | **o mesmo código** (`lambda/agente_estoque/`), com o mesmo evento JSON do Bedrock |
 | EC2 + nginx | uvicorn + `vite preview` servindo o build de produção com proxy `/api` |
@@ -90,34 +91,35 @@ VIRTUAL_ENV=$PWD/.venv PATH=$PWD/.venv/bin:$PATH .venv/bin/nodeenv -p --node=20.
 ### Rodar
 
 ```bash
-.venv/bin/python local/rodar.py        # sobe banco + S3 + API + site → http://localhost:4173
+.venv/bin/python local/rodar.py        # sobe S3 + API + site → http://localhost:4173
 ```
 
 Telas: **Dashboard** (indicadores e gráficos), **Produtos** (catálogo com fotos), **Cadastro**
-(com upload de foto para o S3), **Movimentações**, **Arquitetura AWS** (status ao vivo) e o
-**Assistente IA** flutuante em todas as telas (mostra as ferramentas que chamou).
+(código gerado automaticamente + upload de foto, tudo salvo no S3), **Movimentações**,
+**Arquitetura AWS** (status ao vivo) e o **Assistente IA** flutuante em todas as telas (mostra
+as ferramentas que chamou).
 
 Outros comandos:
 
 ```bash
-.venv/bin/python local/servicos.py status                  # situação de cada serviço
-.venv/bin/python local/servicos.py derrubar banco|s3|agente  # simular falhas (ver docs/FALHAS_E_SEGURANCA.md)
+.venv/bin/python local/servicos.py status                 # situação de cada serviço
+.venv/bin/python local/servicos.py derrubar s3|agente      # simular falhas (ver docs/FALHAS_E_SEGURANCA.md)
 .venv/bin/python local/servicos.py restaurar todos
-.venv/bin/python local/chat.py                             # chat pelo terminal
-.venv/bin/python local/banco.py psql "select sku, name, quantity from items"
-.venv/bin/python local/servicos.py encerrar                # desliga banco e S3
+.venv/bin/python local/chat.py                            # chat pelo terminal
+.venv/bin/python local/servicos.py encerrar                # desliga o S3 local
 ```
 
-### Testes automatizados (42)
+### Testes automatizados (86)
 
 ```bash
 cd backend && ../.venv/bin/python -m pytest -q
 ```
 
-- **API:** produtos, movimentações, validações, fotos no S3 emulado.
+- **API:** produtos, movimentações, validações, fotos e dados no S3 emulado.
 - **Lambda e contrato:** eventos no formato do Bedrock; o `action_group.json` precisa bater com a Lambda.
 - **Agente:** conversas completas por `/api/chat`.
-- **Falhas:** banco, S3 e agente fora do ar (incluindo o circuit breaker).
+- **Guardrails:** SQL injection, prompt injection, pedidos de segredos/infraestrutura (bloqueados) e perguntas legítimas (nunca bloqueadas).
+- **Falhas:** S3 e agente fora do ar (incluindo o circuit breaker) — como o S3 guarda fotos E dados, derrubá-lo tira o sistema inteiro do ar, de propósito.
 - **Segurança:** nenhuma chave no repositório e nenhum detalhe interno nas respostas.
 
 ## Fase 2: subir na AWS

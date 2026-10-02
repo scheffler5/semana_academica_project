@@ -2,10 +2,7 @@
 import random
 from datetime import timedelta
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
-
-from .models import Item, Movement, utcnow
+from . import store
 
 # sku, nome, categoria, estoque atual, mínimo, preço, saída média por dia
 SAMPLE_ITEMS = [
@@ -22,30 +19,38 @@ SAMPLE_ITEMS = [
 ]
 
 
-def seed(db: Session) -> None:
-    if db.scalar(select(func.count(Item.id))):
-        return
+def seed() -> None:
+    if store.load_items():
+        return  # já tem dados (seja de exemplo ou cadastrados pela turma): não mexe
 
     rng = random.Random(42)
-    now = utcnow()
+    now = store.utcnow()
+    items, movements = [], []
+    next_item_id, next_mov_id = 1, 1
 
     for sku, name, category, current_qty, min_qty, price, daily in SAMPLE_ITEMS:
-        item = Item(sku=sku, name=name, category=category, quantity=current_qty,
-                    min_quantity=min_qty, unit_price=price,
-                    created_at=now - timedelta(days=31))
-        db.add(item)
-        db.flush()
+        item_id = next_item_id
+        next_item_id += 1
+        items.append({
+            "id": item_id, "sku": sku, "name": name, "category": category,
+            "quantity": current_qty, "min_quantity": min_qty, "unit_price": price,
+            "image_key": None, "created_at": (now - timedelta(days=31)).isoformat(),
+        })
 
         for days_ago in range(30, -1, -1):
             day = now - timedelta(days=days_ago, hours=rng.randint(0, 8))
             weekend = day.weekday() >= 5
             out = max(0, round(rng.gauss(daily * (0.4 if weekend else 1.15), daily * 0.4)))
             if out:
-                db.add(Movement(item_id=item.id, type="saida", quantity=out,
-                                note="Venda", created_at=day))
+                movements.append({"id": next_mov_id, "item_id": item_id, "type": "saida",
+                                  "quantity": out, "note": "Venda", "created_at": day.isoformat()})
+                next_mov_id += 1
             # reposição semanal do fornecedor
             if days_ago % 7 == 3:
-                db.add(Movement(item_id=item.id, type="entrada", quantity=round(daily * 7),
-                                note="Reposição do fornecedor", created_at=day + timedelta(hours=1)))
+                movements.append({"id": next_mov_id, "item_id": item_id, "type": "entrada",
+                                  "quantity": round(daily * 7), "note": "Reposição do fornecedor",
+                                  "created_at": (day + timedelta(hours=1)).isoformat()})
+                next_mov_id += 1
 
-    db.commit()
+    store.save_items(items)
+    store.save_movements(movements)

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import {
-  AlertTriangle, CheckCircle2, CircleSlash, Database, ImageOff, Info, Package, RefreshCw, Server, Sparkles, X,
+  AlertTriangle, CheckCircle2, CircleSlash, ImageOff, Info, Package, RefreshCw, Server, Sparkles, X,
 } from "lucide-react";
 import { SERVICE_NAMES } from "../api.js";
 import { useApp } from "../context.jsx";
 
-const SERVICE_ICONS = { api: Server, database: Database, s3: ImageOff, agent: Sparkles };
+const SERVICE_ICONS = { api: Server, s3: ImageOff, agent: Sparkles };
 
 /** Estado de erro de uma tela inteira, dizendo qual serviço falhou. */
 export function ErrorState({ error, onRetry, compact = false }) {

@@ -1,9 +1,8 @@
-import { Activity, Bot, Cloud, Database, Globe, HardDrive, KeyRound, Network, Server, Users, Zap } from "lucide-react";
+import { Activity, Bot, Cloud, Globe, HardDrive, KeyRound, Network, Server, Users, Zap } from "lucide-react";
 
 // Cores das categorias de serviço usadas nos diagramas oficiais da AWS
 const C = {
   compute: "#ED7100",
-  database: "#C925D1",
   storage: "#7AA116",
   ai: "#01A88D",
   management: "#E7157B",
@@ -63,8 +62,8 @@ function Flow({ points, n, label, lx, ly, anchor = "middle", dashed = false, bel
 export default function ArchitectureDiagram({ status = {} }) {
   return (
     <figure className="arch-figure">
-      <svg viewBox="0 0 1200 770" className="arch-diagram" role="img"
-        aria-label="Arquitetura do Estoque Inteligente na AWS: usuários acessam a EC2 pública via Internet Gateway; a EC2 grava no Aurora e no S3 e consulta o Bedrock Agent, que aciona a Lambda nas sub-redes privadas; a Lambda chama a API da EC2 pelo IP privado.">
+      <svg viewBox="0 0 1200 720" className="arch-diagram" role="img"
+        aria-label="Arquitetura do Estoque Inteligente na AWS: usuários acessam a EC2 pública via Internet Gateway; a EC2 grava os dados e as fotos no S3 e consulta o Bedrock Agent, que aciona a Lambda na sub-rede privada; a Lambda chama a API da EC2 pelo IP privado.">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill={C.dark} />
@@ -72,54 +71,52 @@ export default function ArchitectureDiagram({ status = {} }) {
         </defs>
 
         {/* -------- agrupamentos */}
-        <Group x={190} y={14} w={990} h={742} label="AWS Cloud" stroke={C.dark} icon={Cloud} />
-        <Group x={210} y={54} w={950} h={686} label="Região us-east-1 (N. Virginia)" stroke="#00A4A6" dashed />
-        <Group x={240} y={96} w={570} h={624} label="VPC 10.0.0.0/16" stroke={C.network} icon={Network} />
+        <Group x={190} y={14} w={990} h={680} label="AWS Cloud" stroke={C.dark} icon={Cloud} />
+        <Group x={210} y={54} w={950} h={624} label="Região us-east-1 (N. Virginia)" stroke="#00A4A6" dashed />
+        <Group x={240} y={96} w={570} h={534} label="VPC 10.0.0.0/16" stroke={C.network} icon={Network} />
 
-        <Group x={290} y={152} w={500} h={284} label="AZ us-east-1a" stroke="#147EBA" dashed />
-        <Group x={306} y={184} w={214} h={236} label="Sub-rede pública" stroke={C.storage} fill="#F2F6E8" labelColor="#3d5c0a" />
-        <Group x={556} y={184} w={218} h={236} label="Sub-rede privada" stroke="#00A4A6" fill="#E6F6F7" labelColor="#006b6d" />
+        <Group x={290} y={152} w={500} h={240} label="AZ us-east-1a" stroke="#147EBA" dashed />
+        <Group x={306} y={184} w={214} h={192} label="Sub-rede pública" stroke={C.storage} fill="#F2F6E8" labelColor="#3d5c0a" />
+        <Group x={556} y={184} w={218} h={192} label="Sub-rede privada" stroke="#00A4A6" fill="#E6F6F7" labelColor="#006b6d" />
 
-        <Group x={290} y={454} w={500} h={252} label="AZ us-east-1b" stroke="#147EBA" dashed />
-        <Group x={306} y={486} w={214} h={204} label="Sub-rede pública" stroke={C.storage} fill="#F2F6E8" labelColor="#3d5c0a" />
-        <Group x={556} y={486} w={218} h={204} label="Sub-rede privada" stroke="#00A4A6" fill="#E6F6F7" labelColor="#006b6d" />
+        <Group x={290} y={410} w={500} h={204} label="AZ us-east-1b" stroke="#147EBA" dashed />
+        <Group x={306} y={442} w={214} h={156} label="Sub-rede pública" stroke={C.storage} fill="#F2F6E8" labelColor="#3d5c0a" />
+        <Group x={556} y={442} w={218} h={156} label="Sub-rede privada" stroke="#00A4A6" fill="#E6F6F7" labelColor="#006b6d" />
 
         {/* -------- fluxos (desenhados antes dos ícones para passar por baixo) */}
-        <Flow points="105,300 222,300" />
-        <Flow points="270,300 420,300" n="1" label="HTTP :80" lx={150} ly={300} />
-        <Flow points="480,282 634,282" n="2" label="SQL :5432" lx={557} ly={282} />
-        <Flow points="634,350 480,318" n="6" label="HTTP /api" lx={562} ly={335} below />
-        <Flow points="440,270 440,124 918,124 918,170 960,170" n="3" label="fotos (IAM Role)" lx={680} ly={124} />
-        <Flow points="464,270 464,140 902,140 902,330 960,330" n="4" label="InvokeAgent" lx={902} ly={240} anchor="start" />
-        <Flow points="960,352 686,352" n="5" label="executa ferramenta" lx={836} ly={352} />
-        <Flow points="686,372 872,372 872,498 960,498" dashed n="7" label="logs" lx={872} ly={440} anchor="start" />
+        <Flow points="105,280 222,280" />
+        <Flow points="270,280 420,280" n="1" label="HTTP :80" lx={150} ly={280} />
+        <Flow points="636,280 478,280" n="5" label="HTTP /api · IP privado" lx={558} ly={280} below />
+        <Flow points="440,250 440,124 918,124 918,170 960,170" n="2" label="dados e fotos (IAM Role)" lx={680} ly={124} />
+        <Flow points="464,250 464,140 902,140 902,330 960,330" n="3" label="InvokeAgent" lx={902} ly={258} anchor="start" />
+        <Flow points="960,340 760,340 760,280 686,280" n="4" label="executa ferramenta" lx={850} ly={340} />
+        <Flow points="686,264 872,264 872,498 960,498" dashed n="6" label="logs" lx={872} ly={420} anchor="start" />
 
         {/* -------- serviços */}
-        <Service x={75} y={300} icon={Users} color={C.dark} title="Usuários" subtitle="PCs do laboratório" />
-        <Service x={246} y={300} icon={Globe} color={C.network} title="Internet" subtitle="Gateway" size={44} />
+        <Service x={75} y={280} icon={Users} color={C.dark} title="Usuários" subtitle="PCs do laboratório" />
+        <Service x={246} y={280} icon={Globe} color={C.network} title="Internet" subtitle="Gateway" size={44} />
 
-        <Service x={450} y={300} icon={Server} color={C.compute} title="Amazon EC2" subtitle="nginx · React · FastAPI" status={status.api} />
-        <text x={450} y={378} textAnchor="middle" className="d-tag">SG :80 · IAM Role</text>
+        <Service x={450} y={280} icon={Server} color={C.compute} title="Amazon EC2" subtitle="nginx · React · FastAPI" status={status.api} />
+        <text x={450} y={358} textAnchor="middle" className="d-tag">SG :80 · IAM Role</text>
 
-        <Service x={660} y={262} icon={Database} color={C.database} title="Aurora PostgreSQL" subtitle="Serverless v2" status={status.database} size={48} />
-        <Service x={660} y={352} icon={Zap} color={C.compute} title="AWS Lambda" subtitle="ferramentas do agente" status={status.agent} size={48} />
+        <Service x={660} y={280} icon={Zap} color={C.compute} title="AWS Lambda" subtitle="ferramentas do agente" status={status.agent} size={48} />
 
-        <text x={412} y={594} textAnchor="middle" className="d-muted">reservada para</text>
-        <text x={412} y={610} textAnchor="middle" className="d-muted">alta disponibilidade</text>
-        <Service x={660} y={548} icon={Database} color={C.database} title="Aurora (2ª AZ)" subtitle="subnet group" dashed size={40} />
-        <Service x={660} y={642} icon={Zap} color={C.compute} title="Lambda (ENI)" dashed size={34} />
+        <text x={412} y={508} textAnchor="middle" className="d-muted">reservada para</text>
+        <text x={412} y={524} textAnchor="middle" className="d-muted">alta disponibilidade</text>
+        <Service x={660} y={520} icon={Zap} color={C.compute} title="Lambda (ENI)" dashed size={34} />
 
         <text x={862} y={92} className="d-group" fill="#006b6d">Serviços regionais (fora da VPC)</text>
-        <Service x={990} y={170} icon={HardDrive} color={C.storage} title="Amazon S3" subtitle="bucket privado · fotos" status={status.s3} />
+        <Service x={990} y={170} icon={HardDrive} color={C.storage} title="Amazon S3" subtitle="bucket privado · dados e fotos" status={status.s3} />
         <Service x={990} y={340} icon={Bot} color={C.ai} title="Amazon Bedrock" subtitle="Agent + Claude + Guardrails" status={status.agent} />
         <Service x={990} y={498} icon={Activity} color={C.management} title="CloudWatch" subtitle="logs e métricas" />
-        <Service x={990} y={640} icon={KeyRound} color={C.security} title="IAM" subtitle="roles EC2 · Lambda · Agent" />
+        <Service x={990} y={598} icon={KeyRound} color={C.security} title="IAM" subtitle="roles EC2 · Lambda · Agent" />
       </svg>
       <figcaption>
-        <b>1</b> Os usuários acessam a EC2 pela internet (Internet Gateway, porta 80). <b>2</b> A API grava e lê no Aurora,
-        isolado em sub-rede privada. <b>3</b> As fotos vão para um bucket S3 privado, com as credenciais temporárias da IAM Role.
-        <b>4</b> O chat é enviado ao Bedrock Agent, que <b>5</b> executa as ferramentas na Lambda; a Lambda <b>6</b> chama a API
-        pelo IP privado, sem sair da VPC. <b>7</b> Tudo registra logs no CloudWatch. Nenhuma chave de acesso existe no código.
+        <b>1</b> Os usuários acessam a EC2 pela internet (Internet Gateway, porta 80). <b>2</b> A API lê e grava os dados
+        (JSON) e as fotos no mesmo bucket S3 privado, com as credenciais temporárias da IAM Role — é o único armazenamento
+        do sistema. <b>3</b> O chat é enviado ao Bedrock Agent, que <b>4</b> executa as ferramentas na Lambda, na sub-rede
+        privada; a Lambda <b>5</b> chama a API pelo IP privado, sem sair da VPC. <b>6</b> Tudo registra logs no CloudWatch.
+        Nenhuma chave de acesso existe no código.
       </figcaption>
     </figure>
   );

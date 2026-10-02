@@ -1,12 +1,14 @@
-"""Serviços locais que imitam a AWS, e comandos para SIMULAR FALHAS na aula.
+"""Serviço local que imita a AWS, e comandos para SIMULAR FALHAS na aula.
+
+O S3 (emulador Moto) é o ÚNICO armazenamento do sistema: guarda as fotos E os dados
+(items.json / movements.json). Por isso só existem dois "interruptores": s3 e agente.
 
     python local/servicos.py status
-    python local/servicos.py iniciar            # banco (PostgreSQL) + S3 (emulador Moto)
-    python local/servicos.py derrubar banco     # para o PostgreSQL (como o Aurora fora do ar)
+    python local/servicos.py iniciar            # sobe o S3 (emulador Moto)
     python local/servicos.py derrubar s3        # congela o S3 (requisições dão timeout, como rede bloqueada)
     python local/servicos.py derrubar agente    # a "Lambda" de ferramentas deixa de responder
-    python local/servicos.py restaurar banco|s3|agente|todos
-    python local/servicos.py encerrar           # desliga tudo (as fotos do S3 local são perdidas)
+    python local/servicos.py restaurar s3|agente|todos
+    python local/servicos.py encerrar           # desliga tudo (fotos e dados do S3 local são perdidos)
 
 Segurança: o emulador de S3 recebe credenciais FALSAS geradas aleatoriamente e guardadas em
 .local/credenciais-locais.env (fora do git, permissão 600). Elas nunca são exibidas.
@@ -33,9 +35,6 @@ S3_URL = f"http://127.0.0.1:{S3_PORT}"
 BUCKET = "estoque-imagens-local"
 VENV_BIN = Path(sys.executable).parent
 
-sys.path.insert(0, str(ROOT / "local"))
-import banco  # noqa: E402
-
 
 # ------------------------------------------------------------------ credenciais falsas
 
@@ -60,7 +59,6 @@ def credentials() -> dict:
 def api_env() -> dict:
     """Variáveis para a API rodar localmente como na AWS (sem imprimir nenhum segredo)."""
     return {
-        "DATABASE_URL": banco.database_url(banco.server()),
         "S3_BUCKET": BUCKET,
         "S3_ENDPOINT_URL": S3_URL,
         "AWS_REGION": "us-east-1",
@@ -154,22 +152,7 @@ def s3_status() -> str:
     return "DERRUBADO (congelado)" if state.strip().startswith("T") else f"rodando em {S3_URL}"
 
 
-# ------------------------------------------------------------------ banco e agente
-
-def stop_db() -> None:
-    """Para o PostgreSQL de verdade (pg_ctl), mesmo com a API conectada — como o Aurora caindo."""
-    import pgserver
-
-    pg_ctl = Path(pgserver.__file__).parent / "pginstall" / "bin" / "pg_ctl"
-    if (banco.PGDATA / "postmaster.pid").exists():
-        subprocess.run([str(pg_ctl), "-D", str(banco.PGDATA), "stop", "-m", "fast"],
-                       capture_output=True, check=False)
-
-
-def db_status() -> str:
-    pid_file = banco.PGDATA / "postmaster.pid"
-    return "rodando (PostgreSQL 16)" if pid_file.exists() else "parado"
-
+# ------------------------------------------------------------------ agente
 
 def agent_down(down: bool) -> None:
     FAILURES.mkdir(parents=True, exist_ok=True)
@@ -189,10 +172,9 @@ def api_status() -> str:
 
 
 def status() -> None:
-    print(f"  Banco (Aurora → PostgreSQL local): {db_status()}")
-    print(f"  S3 (→ emulador Moto):              {s3_status()}")
-    print(f"  Agente (Bedrock+Lambda → simulado): {'DERRUBADO' if (FAILURES / 'agente').exists() else 'ok'}")
-    print(f"  API (EC2 → uvicorn local):         {api_status()}")
+    print(f"  S3 (fotos + dados, → emulador Moto): {s3_status()}")
+    print(f"  Agente (Bedrock+Lambda → simulado):  {'DERRUBADO' if (FAILURES / 'agente').exists() else 'ok'}")
+    print(f"  API (EC2 → uvicorn local):           {api_status()}")
 
 
 # ------------------------------------------------------------------ comandos
@@ -202,22 +184,17 @@ def main() -> None:
     command, target = args[0], (args[1] if len(args) > 1 else "todos")
 
     if command == "iniciar":
-        banco.start()
         start_s3()
         agent_down(False)
     elif command == "derrubar":
-        if target == "banco":
-            stop_db()
-        elif target == "s3":
+        if target == "s3":
             freeze_s3()
         elif target == "agente":
             agent_down(True)
         else:
-            sys.exit("Use: derrubar banco | s3 | agente")
+            sys.exit("Use: derrubar s3 | agente")
         print(f"💥 {target} derrubado. Veja o efeito no site (barra de status e telas).")
     elif command == "restaurar":
-        if target in ("banco", "todos"):
-            banco.start()
         if target in ("s3", "todos"):
             resume_s3()
         if target in ("agente", "todos"):
@@ -225,7 +202,6 @@ def main() -> None:
         print(f"✅ {target} restaurado.")
     elif command == "encerrar":
         stop_s3()
-        stop_db()
         agent_down(False)
     elif command != "status":
         print(__doc__)

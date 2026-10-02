@@ -10,8 +10,8 @@ export const NAV = [
   { id: "arquitetura", label: "Arquitetura AWS", icon: Cloud },
 ];
 
-const PILLS = ["database", "s3", "agent"];
-const SHORT = { database: "Banco", s3: "S3", agent: "IA" };
+const PILLS = ["s3", "agent"];
+const SHORT = { s3: "S3", agent: "IA" };
 const STATUS_TEXT = { ok: "operando", down: "fora do ar", disabled: "não configurado", simulated: "simulado", unknown: "verificando" };
 
 export function Sidebar({ page, onNavigate }) {
@@ -74,8 +74,7 @@ export function StatusPills() {
 export function ServiceBanner() {
   const { serviceStatus, apiDown, health } = useApp();
   const IMPACT = {
-    database: "Nenhuma tela consegue ler ou gravar dados até o banco voltar.",
-    s3: "Fotos e uploads indisponíveis. Cadastro, consultas e o assistente continuam funcionando.",
+    s3: "Fotos e dados vivem no S3: nenhuma tela consegue ler ou gravar nada até ele voltar.",
     agent: "O assistente de IA não responde. O restante do sistema funciona normalmente.",
   };
   if (apiDown) {

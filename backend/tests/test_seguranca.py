@@ -45,16 +45,15 @@ def test_nenhum_segredo_no_repositorio():
 
 
 def test_repositorio_so_tem_codigo():
-    """Imagens e bancos de dados nunca vão para o git (os dados são criados pelo seed.py)."""
+    """Imagens e bancos de dados nunca vão para o git (os dados são criados pelo seed.py em
+    runtime, dentro do S3 — não existe mais nenhum arquivo .sql/.db no repositório)."""
     proibidos = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".ico", ".db", ".sqlite", ".sqlite3", ".sql", ".dump")
-    permitidos = {"deploy/schema.sql"}  # código de criação das tabelas (sem dados)
-    encontrados = [str(p.relative_to(ROOT)) for p in repo_files()
-                   if p.suffix.lower() in proibidos and str(p.relative_to(ROOT)) not in permitidos]
+    encontrados = [str(p.relative_to(ROOT)) for p in repo_files() if p.suffix.lower() in proibidos]
     assert not encontrados, encontrados
 
 
 def test_arquivos_sensiveis_ignorados_pelo_git():
-    for sensitive in ["backend/.env", ".local/credenciais-locais.env", ".pgdata/PG_VERSION"]:
+    for sensitive in ["backend/.env", ".local/credenciais-locais.env"]:
         result = subprocess.run(["git", "check-ignore", "-q", sensitive], cwd=ROOT)
         assert result.returncode == 0, f"{sensitive} NÃO está no .gitignore"
 
@@ -62,7 +61,7 @@ def test_arquivos_sensiveis_ignorados_pelo_git():
 def test_health_nao_expoe_configuracao(api):
     text = api.get("/api/health").text
     from conftest import BUCKET
-    for secret_ish in [BUCKET, "AWS_", "password", "DATABASE_URL", "private_ip", "endpoint_url", "127.0.0.1"]:
+    for secret_ish in [BUCKET, "AWS_", "password", "private_ip", "endpoint_url", "127.0.0.1"]:
         assert secret_ish not in text, secret_ish
 
 

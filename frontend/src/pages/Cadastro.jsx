@@ -102,7 +102,7 @@ export default function Cadastro({ onNavigate }) {
 
   return (
     <>
-      <PageHeader title="Cadastro de produtos" subtitle="Cadastre produtos com foto. Os dados vão para o banco (Aurora) e a foto para o Amazon S3." />
+      <PageHeader title="Cadastro de produtos" subtitle="Cadastre produtos com foto. Os dados e a foto vão para o Amazon S3." />
 
       {pendingPhoto && (
         <div className="callout warning">

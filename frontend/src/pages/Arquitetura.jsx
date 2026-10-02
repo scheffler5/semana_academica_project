@@ -1,4 +1,4 @@
-import { Activity, Bot, Database, Download, HardDrive, KeyRound, Network, RefreshCw, Server, Zap } from "lucide-react";
+import { Activity, Bot, Download, HardDrive, KeyRound, Network, RefreshCw, Server, Zap } from "lucide-react";
 import ArchitectureDiagram from "../components/ArchitectureDiagram.jsx";
 import { PageHeader } from "../components/ui.jsx";
 import { useApp } from "../context.jsx";
@@ -15,16 +15,14 @@ const STATUS = {
 const CARDS = [
   { key: "api", icon: Server, name: "Amazon EC2", local: "uvicorn na sua máquina",
     role: "Servidor na sub-rede pública: o nginx entrega o site (React) e repassa /api para o FastAPI." },
-  { key: "database", icon: Database, name: "Amazon Aurora PostgreSQL", local: "PostgreSQL 16 local",
-    role: "Banco relacional gerenciado e serverless, em sub-redes privadas: só a EC2 acessa (porta 5432)." },
   { key: "s3", icon: HardDrive, name: "Amazon S3", local: "emulador Moto (API do S3)",
-    role: "Fotos em bucket privado. O navegador recebe as fotos pela API; nenhuma credencial sai do servidor." },
+    role: "Bucket privado com as fotos E os dados do estoque (items.json/movements.json): é o único armazenamento do sistema. O navegador nunca acessa o S3 direto; tudo passa pela API." },
   { key: "agent", icon: Bot, name: "Amazon Bedrock Agents", local: "agente simulado (regras)",
     role: "LLM (Claude) com Guardrails: entende o pedido e decide qual ferramenta usar." },
   { key: "agent", icon: Zap, name: "AWS Lambda", local: "mesmo código, executado localmente",
     role: "Ferramentas do agente com validação e permissões; chama a API pelo IP privado da VPC." },
   { key: null, icon: Network, name: "Amazon VPC + Internet Gateway", local: "localhost",
-    role: "Rede isolada em 2 zonas de disponibilidade: sub-redes públicas (EC2) e privadas (Aurora, Lambda)." },
+    role: "Rede isolada em 2 zonas de disponibilidade: sub-rede pública (EC2, acessível pela internet) e privada (Lambda, só alcançável de dentro da VPC)." },
   { key: null, icon: KeyRound, name: "AWS IAM", local: "credenciais falsas só para o emulador",
     role: "Roles para EC2, Lambda e Agent com privilégio mínimo: nada de chaves de acesso no código." },
   { key: null, icon: Activity, name: "Amazon CloudWatch", local: "logs no terminal",
@@ -76,7 +74,7 @@ export default function Arquitetura() {
       />
 
       <div className="card">
-        <ArchitectureDiagram status={{ api: s("api"), database: s("database"), s3: s("s3"), agent: s("agent") }} />
+        <ArchitectureDiagram status={{ api: s("api"), s3: s("s3"), agent: s("agent") }} />
       </div>
 
       <div className="service-cards">

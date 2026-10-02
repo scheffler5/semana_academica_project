@@ -4,7 +4,7 @@ Toda resposta de erro tem o MESMO formato, para o site mostrar uma mensagem clar
 dizendo QUAL serviço falhou (ótimo para demonstrar falhas em aula):
 
     {"error": "service_unavailable", "service": "s3",
-     "message": "Armazenamento de fotos (Amazon S3) indisponível...", "request_id": "a1b2c3d4"}
+     "message": "Armazenamento (Amazon S3) indisponível...", "request_id": "a1b2c3d4"}
 
 Segurança: detalhes técnicos (exceções, hosts, ARNs, IDs de conta) vão SÓ para o log do
 servidor, junto com o request_id. O cliente nunca recebe texto de exceção.
@@ -17,15 +17,13 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import DBAPIError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = logging.getLogger("estoque")
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
 SERVICES = {
-    "database": "Banco de dados (Amazon Aurora)",
-    "s3": "Armazenamento de fotos (Amazon S3)",
+    "s3": "Armazenamento (Amazon S3)",
     "agent": "Assistente de IA (Amazon Bedrock + Lambda)",
 }
 
@@ -73,15 +71,6 @@ def install(app: FastAPI) -> None:
     async def service_unavailable(request: Request, exc: ServiceUnavailable):
         log.warning("[%s] %s indisponível: %s", request_id_var.get(), exc.service, exc.__cause__ or exc.message)
         return JSONResponse(_body("service_unavailable", exc.message, exc.service), status_code=503)
-
-    @app.exception_handler(OperationalError)
-    @app.exception_handler(DBAPIError)
-    async def database_error(request: Request, exc: Exception):
-        log.error("[%s] erro de banco: %s", request_id_var.get(), exc)
-        return JSONResponse(
-            _body("service_unavailable", f"{SERVICES['database']} indisponível. Tente novamente em instantes.", "database"),
-            status_code=503,
-        )
 
     @app.exception_handler(BotoCoreError)
     @app.exception_handler(ClientError)

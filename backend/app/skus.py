@@ -6,11 +6,6 @@ O usuário não precisa inventar código: o sistema garante que é único.
 import re
 import unicodedata
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from .models import Item
-
 
 def prefix(category: str) -> str:
     text = unicodedata.normalize("NFKD", category or "")
@@ -18,9 +13,8 @@ def prefix(category: str) -> str:
     return (letters[:3] or "GER").ljust(3, "X")
 
 
-def next_sku(db: Session, category: str) -> str:
+def next_sku(items: list, category: str) -> str:
     p = prefix(category)
     pattern = re.compile(rf"^{p}-(\d+)$")
-    existing = db.scalars(select(Item.sku).where(Item.sku.like(f"{p}-%")))
-    numbers = [int(m.group(1)) for sku in existing if (m := pattern.match(sku))]
+    numbers = [int(m.group(1)) for it in items if (m := pattern.match(it["sku"]))]
     return f"{p}-{max(numbers, default=0) + 1:03d}"

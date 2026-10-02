@@ -5,10 +5,9 @@ def test_health(api):
     body = api.get("/api/health").json()
     assert body["status"] == "ok"
     services = body["services"]
-    assert services["database"]["status"] == "ok"
     assert services["s3"]["status"] == "ok"
     assert services["agent"]["status"] == "simulated"
-    assert "sagemaker" not in services
+    assert "database" not in services and "sagemaker" not in services
     assert body["agent_mode"] == "simulado"
 
 
@@ -68,9 +67,9 @@ def test_foto_no_s3(api, item):
     photo = api.get(url)
     assert photo.content == PNG and photo.headers["content-type"] == "image/png"
 
-    from app import storage
+    from app import s3client
     from conftest import BUCKET
-    keys = [o["Key"] for o in storage._s3.list_objects_v2(Bucket=BUCKET)["Contents"]]
+    keys = [o["Key"] for o in s3client._s3.list_objects_v2(Bucket=BUCKET)["Contents"]]
     assert any(k.startswith(f"itens/{item_id}/") for k in keys)
 
 

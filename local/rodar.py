@@ -1,6 +1,6 @@
 """Sobe o sistema inteiro localmente, montado como em produção:
 
-    PostgreSQL (no lugar do Aurora) + emulador de S3 (Moto) + API FastAPI (como na EC2)
+    emulador de S3 (Moto, guarda fotos E dados) + API FastAPI (como na EC2)
     + build de produção do React servido com proxy /api (como o nginx)
 
     python local/rodar.py            # http://localhost:4173
@@ -45,8 +45,7 @@ def main() -> None:
         sys.exit("npm não encontrado. Veja a instalação do Node no README (nodeenv).")
     node_env = {**os.environ, "PATH": f"{VENV_BIN}{os.pathsep}{os.environ['PATH']}"}
 
-    print("▶ Serviços (PostgreSQL + S3 local)…")
-    servicos.banco.start()
+    print("▶ Serviço (S3 local)…")
     servicos.start_s3()
 
     env = {**os.environ, **servicos.api_env()}
@@ -85,7 +84,7 @@ def main() -> None:
     print()
     servicos.status()
     print("\n  ➜  Site: http://localhost:4173" if ok else "\n  ⚠ Algo não subiu; veja as mensagens acima.")
-    print("     Falhas para a aula: python local/servicos.py derrubar banco|s3|agente\n     Ctrl+C para encerrar.\n")
+    print("     Falhas para a aula: python local/servicos.py derrubar s3|agente\n     Ctrl+C para encerrar.\n")
     try:
         while api.poll() is None and web.poll() is None:
             time.sleep(1)
@@ -99,7 +98,7 @@ def main() -> None:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
-        print("\nAPI e site encerrados. Banco e S3 continuam ligados (python local/servicos.py encerrar).")
+        print("\nAPI e site encerrados. O S3 local continua ligado (python local/servicos.py encerrar).")
 
 
 if __name__ == "__main__":
